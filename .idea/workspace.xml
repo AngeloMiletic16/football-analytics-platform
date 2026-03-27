@@ -1,35 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="2e0e9c47-4b4a-47d0-9001-5962d77da06b" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/football-analytics.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/interim/.gitkeep" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/processed/.gitkeep" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/raw/.gitkeep" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/raw/matches.csv" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/notebooks/01_eda_matches.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/reports/.gitkeep" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sql/create_tables.sql" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/cleaning.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/loaders.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/run_cleaning.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/features/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/models/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/storage/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/storage/init_db.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/utils/__init__.py" afterDir="false" />
-    </list>
+    <list default="true" id="2e0e9c47-4b4a-47d0-9001-5962d77da06b" name="Changes" comment="Initial project structure and match data cleaning pipeline" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -46,6 +18,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "AngeloMiletic16"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/AngeloMiletic16/football-analytics-platform.git",
+    "accountId": "936eda9a-01c5-4c37-a1aa-3e5ce8671b5c"
+  }
+}]]></component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 5
 }</component>
@@ -65,8 +49,9 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "C:/Users/angel/PycharmProjects/football-analytics/data/raw"
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "C:/Users/angel/PycharmProjects/football-analytics/data/raw",
+    "settings.editor.selected.configurable": "org.jetbrains.plugins.github.ui.GithubSettingsConfigurable"
   }
 }]]></component>
   <component name="RecentsManager">
@@ -89,6 +74,18 @@
       <option name="presentableId" value="Default" />
       <updated>1774616697482</updated>
     </task>
+    <task id="LOCAL−00001" summary="Initial project structure and match data cleaning pipeline">
+      <option name="closed" value="true" />
+      <created>1774630486438</created>
+      <option name="number" value="LOCAL−00001" />
+      <option name="presentableId" value="LOCAL−00001" />
+      <updated>1774630486438</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Initial project structure and match data cleaning pipeline" />
+    <option name="LAST_COMMIT_MESSAGE" value="Initial project structure and match data cleaning pipeline" />
   </component>
 </project>
