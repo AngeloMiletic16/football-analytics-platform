@@ -1,0 +1,27 @@
+{
+  "run_id": "ft_result_logreg_20260329_01",
+  "model_name": "logistic_regression",
+  "model_version": "v1",
+  "target_name": "ft_result",
+  "task_type": "multiclass_classification",
+  "split_name": "test",
+  "class_names": ["H", "D", "A"],
+  "feature_names": [
+    "home_elo",
+    "away_elo",
+    "form3_home",
+    "form5_home",
+    "form3_away",
+    "form5_away",
+    "odd_home",
+    "odd_draw",
+    "odd_away",
+    "elo_diff",
+    "form3_diff",
+    "form5_diff",
+    "elo_abs_diff",
+    "form3_abs_diff",
+    "form5_abs_diff",
+    "odd_abs_diff"
+  ]
+}

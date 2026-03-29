@@ -1,0 +1,26 @@
+{
+  "run_id": "home_win_rf_v1",
+  "model_name": "random_forest",
+  "model_version": "v1",
+  "target_name": "home_win",
+  "task_type": "binary_classification",
+  "split_name": "test",
+  "feature_names": [
+    "home_elo",
+    "away_elo",
+    "form3_home",
+    "form5_home",
+    "form3_away",
+    "form5_away",
+    "odd_home",
+    "odd_draw",
+    "odd_away",
+    "elo_diff",
+    "form3_diff",
+    "form5_diff",
+    "elo_abs_diff",
+    "form3_abs_diff",
+    "form5_abs_diff",
+    "odd_abs_diff"
+  ]
+}
