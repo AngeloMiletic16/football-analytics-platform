@@ -11,5 +11,68 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
 
+  superset-db:
+    image: postgres:16
+    container_name: football_superset_db
+    environment:
+      POSTGRES_DB: superset
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset123
+    ports:
+      - "5432:5432"
+    volumes:
+      - superset_db_data:/var/lib/postgresql/data
+
+  superset-init:
+    image: apache/superset:latest
+    container_name: football_superset_init
+    user: "root"
+    depends_on:
+      - superset-db
+    environment:
+      SUPERSET_SECRET_KEY: football_analytics_superset_secret_key
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://superset:superset123@superset-db:5432/superset
+    volumes:
+      - ./superset:/app/pythonpath
+      - superset_home:/app/superset_home
+    command: >
+      /bin/bash -c "
+      python -m ensurepip --upgrade &&
+      python -m pip install --no-cache-dir clickhouse-connect psycopg2-binary &&
+      superset db upgrade &&
+      (superset fab create-admin
+        --username admin
+        --firstname Admin
+        --lastname User
+        --email admin@local.test
+        --password admin || true) &&
+      superset init
+      "
+
+  superset:
+    image: apache/superset:latest
+    container_name: football_superset
+    user: "root"
+    depends_on:
+      - superset-db
+    environment:
+      SUPERSET_SECRET_KEY: football_analytics_superset_secret_key
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://superset:superset123@superset-db:5432/superset
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./superset:/app/pythonpath
+      - superset_home:/app/superset_home
+    command: >
+      /bin/bash -c "
+      python -m ensurepip --upgrade &&
+      python -m pip install --no-cache-dir clickhouse-connect psycopg2-binary &&
+      superset run -h 0.0.0.0 -p 8088
+      "
+
 volumes:
   clickhouse_data:
+  superset_db_data:
+  superset_home:
