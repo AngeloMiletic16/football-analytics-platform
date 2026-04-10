@@ -34,6 +34,15 @@ MODEL_REGISTRY = {
         "artifact_path": PROJECT_ROOT / "artifacts" / "models" / "ft_result_lr_v1.joblib",
         "metadata_path": PROJECT_ROOT / "artifacts" / "metadata" / "ft_result_lr_v1.json",
     },
+    "total_goals_lr_v1": {
+        "model_name": "total_goals_lr_v1",
+        "target": "total_goals",
+        "task_type": "regression",
+        "problem_type": "regression",
+        "algorithm": "linear_regression",
+        "artifact_path": PROJECT_ROOT / "artifacts" / "models" / "total_goals_lr_v1.joblib",
+        "metadata_path": PROJECT_ROOT / "artifacts" / "metadata" / "total_goals_lr_v1.json",
+    },
 }
 
 

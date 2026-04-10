@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,7 +22,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate match predictions from a saved model and write them to ClickHouse."
+        description="Generate predictions from a saved model and write them to ClickHouse."
     )
     parser.add_argument(
         "--model-name",
@@ -79,6 +81,11 @@ def load_dataset(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Dataset not found: {path}")
     return pd.read_csv(path)
+
+
+def extract_model_version(model_name: str) -> str:
+    match = re.search(r"(v\d+)$", model_name)
+    return match.group(1) if match else ""
 
 
 def build_supported_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -160,116 +167,21 @@ def prepare_model_frame(
     return model_df, X
 
 
-def get_estimator_from_pipeline(model):
-    if hasattr(model, "named_steps") and model.named_steps:
-        last_step_name = list(model.named_steps.keys())[-1]
-        return model.named_steps[last_step_name]
-    return model
-
-
-def build_predictions_frame(
-    source_df: pd.DataFrame,
-    model,
-    metadata: dict[str, Any],
-    model_name: str,
-) -> pd.DataFrame:
-    feature_columns = metadata["feature_columns"]
-    target_column = metadata["target"]
-    algorithm = metadata.get("algorithm", "unknown")
-    task_type = metadata.get("task_type", "classification")
-    problem_type = metadata.get("problem_type", "unknown")
-
-    working_df, X = prepare_model_frame(
-        df=source_df,
-        feature_columns=feature_columns,
-        target_column=target_column,
-    )
-
-    y_true = working_df[target_column].copy()
-    y_pred = model.predict(X)
-
-    if not hasattr(model, "predict_proba"):
-        raise ValueError("Model does not support predict_proba, but this pipeline expects probabilities.")
-
-    proba = model.predict_proba(X)
-    estimator = get_estimator_from_pipeline(model)
-    classes = list(estimator.classes_)
-
-    pred_class_idx = proba.argmax(axis=1)
-    predicted_label = np.array(classes, dtype=object)[pred_class_idx]
-    predicted_probability = proba[np.arange(len(proba)), pred_class_idx]
-
-    positive_class_probability = np.full(len(working_df), np.nan)
-    if set(classes) == {0, 1}:
-        positive_idx = classes.index(1)
-        positive_class_probability = proba[:, positive_idx]
-
-    out = pd.DataFrame()
-
-    passthrough_columns = [
-        "match_id",
-        "division",
-        "season",
-        "match_date",
-        "home_team",
-        "away_team",
-        "ft_home",
-        "ft_away",
-        "total_goals",
-    ]
-    for col in passthrough_columns:
-        if col in working_df.columns:
-            out[col] = working_df[col]
-
-    if "match_date" in out.columns:
-        out["match_date"] = pd.to_datetime(out["match_date"], errors="coerce")
-
-    out["model_name"] = model_name
-    out["target"] = target_column
-    out["algorithm"] = algorithm
-    out["task_type"] = task_type
-    out["problem_type"] = problem_type
-
-    out["true_label"] = y_true.astype(str)
-    out["actual_value"] = y_true.astype(str)
-
-    out["predicted_label"] = pd.Series(predicted_label).astype(str)
-    out["predicted_value"] = pd.Series(predicted_label).astype(str)
-    out["predicted_class"] = pd.Series(predicted_label).astype(str)
-
-    out["predicted_probability"] = predicted_probability.astype(float)
-    out["probability"] = predicted_probability.astype(float)
-    out["confidence"] = predicted_probability.astype(float)
-    out["positive_class_probability"] = positive_class_probability.astype(float)
-
-    out["is_correct"] = (pd.Series(predicted_label).astype(str) == y_true.astype(str)).astype(int)
-
-    created_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    out["created_at"] = created_at
-    out["created_at_utc"] = created_at
-
-    return out
-
-
 def get_table_schema(client, table_name: str) -> dict[str, str]:
     result = client.query(f"DESCRIBE TABLE {table_name}")
     return {row[0]: row[1] for row in result.result_rows}
 
 
-def get_table_columns(client, table_name: str) -> list[str]:
-    return list(get_table_schema(client, table_name).keys())
-
-
-def existing_prediction_count(client, model_name: str, target: str) -> int:
-    table_columns = get_table_columns(client, "match_predictions")
+def existing_prediction_count(client, model_name: str, target_name: str) -> int:
+    table_columns = list(get_table_schema(client, "match_predictions").keys())
 
     where_clauses = []
 
     if "model_name" in table_columns:
         where_clauses.append(f"model_name = '{model_name}'")
 
-    if "target" in table_columns:
-        where_clauses.append(f"target = '{target}'")
+    if "target_name" in table_columns:
+        where_clauses.append(f"target_name = '{target_name}'")
 
     if not where_clauses:
         return 0
@@ -281,6 +193,7 @@ def existing_prediction_count(client, model_name: str, target: str) -> int:
     )
     result = client.query(query)
     return int(result.result_rows[0][0])
+
 
 def is_clickhouse_string_type(ch_type: str) -> bool:
     return any(token in ch_type for token in ["String", "Enum", "UUID"])
@@ -353,6 +266,165 @@ def normalize_for_insert(df: pd.DataFrame) -> pd.DataFrame:
     return normalized
 
 
+def build_common_output_frame(
+    working_df: pd.DataFrame,
+    model_name: str,
+    target_name: str,
+    task_type: str,
+) -> pd.DataFrame:
+    out = pd.DataFrame()
+    prediction_run_id = str(uuid.uuid4())
+    model_version = extract_model_version(model_name)
+
+    out["prediction_run_id"] = [prediction_run_id] * len(working_df)
+    out["model_name"] = model_name
+    out["model_version"] = model_version
+    out["target_name"] = target_name
+    out["task_type"] = task_type
+
+    if "match_id" in working_df.columns:
+        out["match_id"] = working_df["match_id"].astype(str)
+    if "match_date" in working_df.columns:
+        out["match_date"] = pd.to_datetime(working_df["match_date"], errors="coerce").dt.date
+    if "division" in working_df.columns:
+        out["division"] = working_df["division"].astype(str)
+    if "home_team" in working_df.columns:
+        out["home_team"] = working_df["home_team"].astype(str)
+    if "away_team" in working_df.columns:
+        out["away_team"] = working_df["away_team"].astype(str)
+
+    if "ft_home" in working_df.columns:
+        out["actual_home_goals"] = pd.to_numeric(working_df["ft_home"], errors="coerce")
+    if "ft_away" in working_df.columns:
+        out["actual_away_goals"] = pd.to_numeric(working_df["ft_away"], errors="coerce")
+    if "ft_result" in working_df.columns:
+        out["actual_ft_result"] = working_df["ft_result"].astype(str)
+    if "home_win" in working_df.columns:
+        out["actual_home_win"] = pd.to_numeric(working_df["home_win"], errors="coerce")
+    if "over_2_5" in working_df.columns:
+        out["actual_over_2_5"] = pd.to_numeric(working_df["over_2_5"], errors="coerce")
+    if "total_goals" in working_df.columns:
+        out["actual_total_goals"] = pd.to_numeric(working_df["total_goals"], errors="coerce")
+
+    return out
+
+
+def build_predictions_frame(
+    source_df: pd.DataFrame,
+    model,
+    metadata: dict[str, Any],
+    model_name: str,
+) -> pd.DataFrame:
+    feature_columns = metadata["feature_columns"]
+    target_name = metadata["target"]
+    task_type = metadata.get("task_type", "classification")
+    problem_type = metadata.get("problem_type", "unknown")
+
+    working_df, X = prepare_model_frame(
+        df=source_df,
+        feature_columns=feature_columns,
+        target_column=target_name,
+    )
+
+    out = build_common_output_frame(
+        working_df=working_df,
+        model_name=model_name,
+        target_name=target_name,
+        task_type=task_type,
+    )
+
+    if task_type == "regression":
+        y_true = pd.to_numeric(working_df[target_name], errors="coerce")
+        y_pred = model.predict(X)
+
+        out["predicted_label"] = None
+        out["predicted_value"] = pd.to_numeric(pd.Series(y_pred), errors="coerce")
+        out["predicted_probability"] = None
+        out["home_win_probability"] = None
+        out["draw_probability"] = None
+        out["away_win_probability"] = None
+        out["over_2_5_probability"] = None
+        out["under_2_5_probability"] = None
+        out["absolute_error"] = (y_true - y_pred).abs()
+        out["is_correct"] = None
+
+        return out
+
+    y_true = working_df[target_name].copy()
+    y_pred = model.predict(X)
+
+    if not hasattr(model, "predict_proba"):
+        raise ValueError("Classification model does not support predict_proba.")
+
+    proba = model.predict_proba(X)
+
+    if hasattr(model, "named_steps") and "model" in model.named_steps:
+        estimator = model.named_steps["model"]
+    else:
+        estimator = model
+
+    classes = list(estimator.classes_)
+    pred_class_idx = proba.argmax(axis=1)
+    predicted_label = np.array(classes, dtype=object)[pred_class_idx]
+    predicted_probability = proba[np.arange(len(proba)), pred_class_idx]
+
+    out["predicted_label"] = pd.Series(predicted_label).astype(str)
+    out["predicted_probability"] = pd.to_numeric(pd.Series(predicted_probability), errors="coerce")
+    out["absolute_error"] = None
+
+    if problem_type == "binary_classification":
+        out["predicted_value"] = pd.to_numeric(pd.Series(predicted_label), errors="coerce")
+        out["is_correct"] = (pd.Series(predicted_label).astype(str) == y_true.astype(str)).astype(int)
+
+        if set(classes) == {0, 1}:
+            positive_idx = classes.index(1)
+            negative_idx = classes.index(0)
+            positive_prob = proba[:, positive_idx]
+            negative_prob = proba[:, negative_idx]
+
+            if target_name == "home_win":
+                out["home_win_probability"] = positive_prob
+                out["draw_probability"] = None
+                out["away_win_probability"] = None
+                out["over_2_5_probability"] = None
+                out["under_2_5_probability"] = None
+            elif target_name == "over_2_5":
+                out["home_win_probability"] = None
+                out["draw_probability"] = None
+                out["away_win_probability"] = None
+                out["over_2_5_probability"] = positive_prob
+                out["under_2_5_probability"] = negative_prob
+            else:
+                out["home_win_probability"] = None
+                out["draw_probability"] = None
+                out["away_win_probability"] = None
+                out["over_2_5_probability"] = None
+                out["under_2_5_probability"] = None
+        else:
+            out["home_win_probability"] = None
+            out["draw_probability"] = None
+            out["away_win_probability"] = None
+            out["over_2_5_probability"] = None
+            out["under_2_5_probability"] = None
+
+        return out
+
+    if problem_type == "multiclass_classification":
+        out["predicted_value"] = None
+        out["is_correct"] = (pd.Series(predicted_label).astype(str) == y_true.astype(str)).astype(int)
+
+        class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
+        out["home_win_probability"] = proba[:, class_to_idx["H"]] if "H" in class_to_idx else None
+        out["draw_probability"] = proba[:, class_to_idx["D"]] if "D" in class_to_idx else None
+        out["away_win_probability"] = proba[:, class_to_idx["A"]] if "A" in class_to_idx else None
+        out["over_2_5_probability"] = None
+        out["under_2_5_probability"] = None
+
+        return out
+
+    raise ValueError(f"Unsupported problem_type for classification: {problem_type}")
+
+
 def insert_predictions(client, predictions_df: pd.DataFrame, table_name: str = "match_predictions") -> int:
     table_schema = get_table_schema(client, table_name)
     table_columns = list(table_schema.keys())
@@ -422,6 +494,7 @@ def main() -> None:
 
     print(f"Prepared rows for insert: {len(predictions_df)}")
     print(f"Target: {metadata['target']}")
+    print(f"Task type: {metadata.get('task_type')}")
     print(f"Algorithm: {metadata.get('algorithm')}")
 
     client = get_clickhouse_client()
@@ -431,12 +504,12 @@ def main() -> None:
         existing_count = existing_prediction_count(
             client=client,
             model_name=args.model_name,
-            target=metadata["target"],
+            target_name=metadata["target"],
         )
         if existing_count > 0:
             raise ValueError(
                 f"match_predictions already contains {existing_count} rows for "
-                f"model_name='{args.model_name}' and target='{metadata['target']}'. "
+                f"model_name='{args.model_name}' and target_name='{metadata['target']}'. "
                 "Use --allow-duplicates only if you intentionally want another insert."
             )
 
